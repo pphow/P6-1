@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>六年级认读游戏</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; padding: 20px; }
+    #word { font-size: 2em; margin: 20px; }
+    #status { font-weight: bold; color: green; }
+    #timer, #score { font-size: 1.2em; margin: 10px; }
+    #leaderboard { margin-top: 30px; }
+    table { margin: auto; border-collapse: collapse; }
+    td, th { border: 1px solid #999; padding: 6px 12px; }
+  </style>
+</head>
+<body>
+  <h1>六年级认读游戏</h1>
+  <p>请把显示的字读出来</p>
+  <button onclick="testMic()">测试麦克风</button>
+  <div id="timer">剩余时间: 90 秒</div>
+  <div id="score">得分: 0</div>
+  <div id="word"></div>
+  <button id="nextBtn" onclick="nextQuestion()">下一题</button>
+  <div id="status"></div>
+  <button id="playAnswerBtn" onclick="playCorrectAnswer()" style="display:none">正确读音</button>
+
+  <div id="result" style="display:none">
+    <p>游戏结束！</p>
+    <p id="finalScore"></p>
+    <p id="finalTime"></p>
+    <input type="text" id="playerName" placeholder="请输入你的名字">
+    <button onclick="saveScore()">提交得分</button>
+  </div>
+
+  <button onclick="restartGame()">重新开始</button>
+
+  <div id="leaderboard">
+    <h2>得分榜</h2>
+    <table id="scoreTable">
+      <thead><tr><th>名字</th><th>得分</th><th>剩余时间</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <script>
+    const words = [
+      "压力很大", "勤奋学习", "克服困难", "订好复习计划", "锻炼身体", "景色优美",
+      "勇敢面对", "被它吸引住了", "常做恶梦", "颜色鲜艳", "狂风阵阵", "树立好榜样"
+    ];
+    let selected = [], currentWord = '', score = 0, timeLeft = 90, timer;
+    let questionCount = 0;
+
+    function shuffle(arr) {
+      return arr.sort(() => Math.random() - 0.5);
+    }
+
+    function startTimer() {
+      timer = setInterval(() => {
+        timeLeft--;
+        document.getElementById('timer').textContent = `剩余时间: ${timeLeft} 秒`;
+        if (timeLeft <= 0) endGame();
+      }, 1000);
+    }
+
+    function nextQuestion() {
+      if (questionCount === 0) {
+        selected = shuffle([...words]).slice(0, 10);
+        startTimer();
+      }
+      if (questionCount >= 10) {
+        endGame();
+        return;
+      }
+      currentWord = selected[questionCount];
+      document.getElementById('word').textContent = currentWord;
+      document.getElementById('status').textContent = '';
+      document.getElementById('playAnswerBtn').style.display = 'none';
+      recognizeSpeech();
+      questionCount++;
+    }
+
+    function recognizeSpeech() {
+      const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+      recognition.lang = 'zh-CN';
+      recognition.start();
+      recognition.onresult = (event) => {
+        const said = event.results[0][0].transcript;
+        console.log('识别结果:', said);
+        if (said.includes(currentWord)) {
+          score += 10;
+          document.getElementById('status').textContent = '恭喜你！读对了！';
+        } else {
+          document.getElementById('status').textContent = '加油！';
+          document.getElementById('playAnswerBtn').style.display = 'inline-block';
+        }
+        document.getElementById('score').textContent = `得分: ${score}`;
+      };
+    }
+
+    function playCorrectAnswer() {
+      const synth = window.speechSynthesis;
+      const utter = new SpeechSynthesisUtterance(currentWord);
+      utter.lang = 'zh-CN';
+      synth.speak(utter);
+    }
+
+    function endGame() {
+      clearInterval(timer);
+      document.getElementById('result').style.display = 'block';
+      document.getElementById('finalScore').textContent = `得分：${score}`;
+      document.getElementById('finalTime').textContent = `所剩时间：${timeLeft} 秒`;
+    }
+
+    function saveScore() {
+      const name = document.getElementById('playerName').value.trim();
+      if (!name) return;
+      const now = Date.now();
+      const record = { name, score, timeLeft, timestamp: now };
+      const board = JSON.parse(localStorage.getItem('leaderboard') || '[]');
+      board.push(record);
+      board.sort((a, b) => b.score - a.score || b.timeLeft - a.timeLeft || b.timestamp - a.timestamp);
+      localStorage.setItem('leaderboard', JSON.stringify(board.slice(0, 10)));
+      updateLeaderboard();
+    }
+
+    function updateLeaderboard() {
+      const tbody = document.querySelector('#scoreTable tbody');
+      tbody.innerHTML = '';
+      const board = JSON.parse(localStorage.getItem('leaderboard') || '[]');
+      board.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${row.name}</td><td>${row.score}</td><td>${row.timeLeft}</td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function restartGame() {
+      score = 0;
+      timeLeft = 90;
+      questionCount = 0;
+      currentWord = '';
+      clearInterval(timer);
+      document.getElementById('word').textContent = '';
+      document.getElementById('score').textContent = '得分: 0';
+      document.getElementById('timer').textContent = '剩余时间: 90 秒';
+      document.getElementById('status').textContent = '';
+      document.getElementById('result').style.display = 'none';
+      document.getElementById('playerName').value = '';
+    }
+
+    function testMic() {
+      const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+      recognition.lang = 'zh-CN';
+      recognition.start();
+      recognition.onresult = (event) => {
+        alert('麦克风测试成功：' + event.results[0][0].transcript);
+      };
+    }
+
+    updateLeaderboard();
+  </script>
+</body>
+</html>
